@@ -3,13 +3,17 @@ package com.tangwh.config;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
+import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
+import org.springframework.security.access.hierarchicalroles.RoleHierarchyImpl;
+import org.springframework.security.authentication.jaas.memory.InMemoryConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.builders.WebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.NoOpPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 
 import java.io.PrintWriter;
 
@@ -28,18 +32,55 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
     }
 
     /**
-     * 配置登录信息
+     * 配置登录信息 1
      *
      * @param auth
      * @throws Exception
      */
+//    @Override
+//    protected void configure(AuthenticationManagerBuilder auth) throws Exception {
+//        // 配置用户名和密码 (在内存中配置)
+//        auth.inMemoryAuthentication()
+//                .withUser("javaboy")
+//                .password("123456")
+//                .roles("admin")
+//                .and()
+//                //添加多用户
+//                .withUser("江南一点雨")
+//                .password("123")
+//                .roles("user");
+//    }
+
+
+    /**
+     * 配置用户信息 二
+     *  基于内存的UserDetailsManager
+     * @return
+     */
     @Override
-    protected void configure(AuthenticationManagerBuilder auth) throws Exception {
-        // 配置用户名和密码 (在内存中配置)
-        auth.inMemoryAuthentication()
-                .withUser("javaboy")
-                .password("123456")
-                .roles("admin");
+    @Bean
+    protected UserDetailsService userDetailsService() {
+        InMemoryUserDetailsManager manager = new InMemoryUserDetailsManager();
+
+        manager.createUser(User.withUsername("javaboy").password("123").roles("admin").build());
+        manager.createUser(User.withUsername("江南一点雨").password("123").roles("user").build());
+
+        return manager;
+
+    }
+
+
+    /**
+     * 角色继承
+     * @return
+     */
+    @Bean
+    RoleHierarchy roleHierarchy(){
+
+        RoleHierarchyImpl hierarchy = new RoleHierarchyImpl();
+        //角色继承
+        hierarchy.setHierarchy("ROLE_admin > ROLE_user");
+        return hierarchy;
     }
 
     /**
@@ -51,13 +92,18 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
     @Override
     protected void configure(HttpSecurity http) throws Exception {
         http.authorizeRequests()
+                // 配置拦截规则 如果你的访问格式 是admin
+                .antMatchers("/admin/**").hasRole("admin")
+                .antMatchers("/user/**").hasRole("user")
+
+
                 //任何请求 需要登录后 才能访问
                 .anyRequest().authenticated()
                 .and()
                 //表单配置
                 .formLogin()
-                //登录页面(隐含 的意思 登录请求也是这个)
-                .loginPage("/login.html")
+                //登录页面(隐含 的意思 登录请求也是这个) -- 前后端不分离
+//                .loginPage("/login.html")
                 //配置登录接口
                 .loginProcessingUrl("/doLogin")
                 //可以修改 登录时候 name 属性框的name
@@ -160,7 +206,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
 
 
     /**
-     * 放心 css
+     * 放行 css
      *
      * @param web
      * @throws Exception
